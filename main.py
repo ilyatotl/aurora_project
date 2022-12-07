@@ -6,7 +6,7 @@ import shutil
 
 app = FastAPI()
 
-file_names: List[str] = []
+file_names: List[str] = ["image.bmp"]
 
 @app.get("/")
 async def read_root():
@@ -24,7 +24,7 @@ async def upload_file(name: str, file: UploadFile):
 
     file_names.append(name)
     return {name: "was added to the server"}
-    
+
 
 @app.get("/api/v1/download/{name}")
 async def download_file(name: str):
