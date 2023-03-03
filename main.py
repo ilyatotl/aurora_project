@@ -1,35 +1,87 @@
+# uvicorn main:app --reload
+
 from typing import List
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 import os
 import shutil
 
 app = FastAPI()
 
-file_names: List[str] = ["image.bmp"]
+
+class Application:
+    def __init__(self,
+                 name: str,
+                 path: str,
+                 picture_path: str,
+                 short_description: str,
+                 long_description: str):
+
+        self.name = name
+        self.path = path
+        self.picture_path = picture_path
+        self.short_description = short_description
+        self.long_description = long_description
+
+
+files: List[Application] = []
+users = {}
 
 @app.get("/")
 async def read_root():
-    return {"Current files": file_names}
+    file_names: List[str] = []
+
+    for file in files:
+        file_names.append(file.name)
+
+    json_data = jsonable_encoder(file_names)
+    return JSONResponse(content=json_data, status_code=200)
 
 
-@app.post("/api/v1/upload/{name}")
-async def upload_file(name: str, file: UploadFile):
-    for file_name in file_names:
-        if file_name == name:
+@app.post("/upload/{name}")
+async def upload_file(name: str, file: UploadFile, image: UploadFile, short_desc: str, long_desc: str):
+    for file in files:
+        if file.name == name:
             raise HTTPException(status_code=400, detail="This file name already exists")
     
     with open("files/" + name, "wb") as wf:
         shutil.copyfileobj(file.file, wf)
 
-    file_names.append(name)
+    with open("iamges/" + name, "wb") as wf:
+        shutil.copyfileobj(image.file, wf)
+
+    files.append(Application(name, "files/" + name,
+                 "images/" + name, short_desc, long_desc))
+
     return {name: "was added to the server"}
 
 
-@app.get("/api/v1/download/{name}")
+@app.get("/download/{name}")
 async def download_file(name: str):
     file_path = os.getcwd() + "/files/" + name
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=name)
 
     raise HTTPException(status_code=404, detail="No files with that name")
+
+
+@app.post("/register")
+async def register(email: str, password: str):
+    for e in users:
+        if e == email:
+            raise HTTPException(
+                status_code=400, detail="User with this email already exists")
+
+    users[email] = password
+    return {email: "was registered"}
+
+
+@app.get("/authorize")
+async def authorize(email: str, password: str):
+    for e in users:
+        if e == email and users[e] == password:
+            return {email: "successfully authorized"}
+
+    raise HTTPException(status_code=401, detail="Wrong email or password")
