@@ -26,7 +26,8 @@ class Application:
         self.long_description = long_description
 
 
-files: List[Application] = []
+files: List[Application] = [Application(
+    "Image", "files/image.bmp", "images/image.bmp", "short_description", "long_description")]
 users = {}
 
 @app.get("/")
@@ -41,15 +42,15 @@ async def read_root():
 
 
 @app.post("/upload/{name}")
-async def upload_file(name: str, file: UploadFile, image: UploadFile, short_desc: str, long_desc: str):
+async def upload_file(name: str, upload_file: UploadFile, image: UploadFile, short_desc: str, long_desc: str):
     for file in files:
         if file.name == name:
             raise HTTPException(status_code=400, detail="This file name already exists")
     
     with open("files/" + name, "wb") as wf:
-        shutil.copyfileobj(file.file, wf)
+        shutil.copyfileobj(upload_file.file, wf)
 
-    with open("iamges/" + name, "wb") as wf:
+    with open("images/" + name, "wb") as wf:
         shutil.copyfileobj(image.file, wf)
 
     files.append(Application(name, "files/" + name,
