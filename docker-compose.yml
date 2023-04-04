@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=111111
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=aurora_store
+    ports:
+      - 5432:5432
+
+  server:
+
+    depends_on:
+      - postgres
+
+    build: server/
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - 8000:8000
