@@ -8,19 +8,20 @@ from fastapi.encoders import jsonable_encoder
 import os
 import shutil
 import psycopg2
+import time
 
 
 def init_sql():
-    with conn.cursor as cursor:
+    with conn.cursor() as cursor:
         cursor.execute(
-            'CREATE TABLE applications (id PRIMARY KEY, name VARCHAR(64))')
-
-        cursor.execute(
-            'INSERT INTO applications (id, name) VALUES (1, image.bmp)')
+            'CREATE TABLE applications (id INT PRIMARY KEY, name VARCHAR(64))')
 
 
+time.sleep(10)
 conn = psycopg2.connect(dbname='aurora_store',
-                        user='ilya', password='111111', host='localhost')
+                        user='ilya', password='111111', host='172.17.0.1')
+
+# host.docker.internal:host-gateway
 
 init_sql()
 

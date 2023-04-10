@@ -3,12 +3,11 @@ version: '3'
 services:
 
   postgres:
-    image: postgres
-    restart: always
+    image: postgres:13
     environment:
-      - POSTGRES_PASSWORD=111111
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=aurora_store
+      POSTGRES_DB: aurora_store
+      POSTGRES_USER: ilya
+      POSTGRES_PASSWORD: 111111
     ports:
       - 5432:5432
 
