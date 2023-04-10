@@ -15,6 +15,7 @@ def init_sql():
     with conn.cursor() as cursor:
         cursor.execute(
             'CREATE TABLE applications (id INT PRIMARY KEY, name VARCHAR(64))')
+    conn.commit()
 
 
 time.sleep(10)
