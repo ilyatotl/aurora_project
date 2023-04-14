@@ -3,13 +3,20 @@ version: '3'
 services:
 
   postgres:
-    image: postgres:13
+    image: postgres:15
+
     environment:
       POSTGRES_DB: aurora_store
       POSTGRES_USER: ilya
       POSTGRES_PASSWORD: 111111
+
     ports:
       - 5432:5432
+
+    volumes:
+      - ./postgresql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
+      - ./postgresql/fill_tables.sql:/docker-entrypoint-initdb.d/fill_tables.sql
+
 
   server:
 
@@ -17,6 +24,8 @@ services:
       - postgres
 
     build: server/
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+    entrypoint: ["bash", "-c", "sleep 10 && uvicorn main:app --host 0.0.0.0 --port 8000"]
+
     ports:
       - 8000:8000
