@@ -87,7 +87,7 @@ async def download_file(name: str):
     file_name = generate_file_name(name)
     file_path = os.getcwd() + "/files/" + file_name + ".rpm"
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name)
+        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name + ".rpm")
 
     raise HTTPException(status_code=404, detail="No files with that name")
 
@@ -97,7 +97,7 @@ async def download_picture(name: str):
     file_name = generate_file_name(name)
     file_path = os.getcwd() + "/images/" + file_name + ".png"
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name)
+        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name + ".png")
 
     raise HTTPException(status_code=404, detail="No files with that name")
 
