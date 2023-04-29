@@ -33,10 +33,6 @@ class Application:
         self.long_description = long_description
 
 
-def generate_file_name(name: str) -> str:
-    return "_".join(name.split())
-
-
 @app.get("/")
 async def read_root():
     l: List[any] = []
@@ -66,38 +62,39 @@ async def upload_file(name: str, upload_file: UploadFile, image: UploadFile, dev
             raise HTTPException(
                 status_code=400, detail="This file name already exists")
 
-    file_name = generate_file_name(name)
-
-    with open("files/" + file_name + ".rpm", "wb") as wf:
-        shutil.copyfileobj(upload_file.file, wf)
-
-    with open("images/" + file_name + ".png", "wb") as wf:
-        shutil.copyfileobj(image.file, wf)
-
     with conn.cursor() as cursor:
         cursor.execute("INSERT INTO applications (name, developer, version, short_description, long_description) VALUES (%s, %s, %s, %s, %s)",
                        (name, developer, version, short_desc, long_desc,))
         conn.commit()
 
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM applications WHERE name = %s", (name,))
+        id = cursor.fetchone()[0]
+        conn.commit()
+
+    with open("files/" + str(id) + ".rpm", "wb") as wf:
+        shutil.copyfileobj(upload_file.file, wf)
+
+    with open("images/" + str(id) + ".png", "wb") as wf:
+        shutil.copyfileobj(image.file, wf)
+
     return {name: "was added to the server"}
 
 
-@app.get("/download/file/{name}")
-async def download_file(name: str):
-    file_name = generate_file_name(name)
-    file_path = os.getcwd() + "/files/" + file_name + ".rpm"
+@app.get("/download/file/{id}")
+async def download_file(id: int):
+    file_path = os.getcwd() + "/files/" + str(id) + ".rpm"
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name + ".rpm")
+        return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".rpm")
 
     raise HTTPException(status_code=404, detail="No files with that name")
 
 
-@app.get("/download/picture/{name}")
-async def download_picture(name: str):
-    file_name = generate_file_name(name)
-    file_path = os.getcwd() + "/images/" + file_name + ".png"
+@app.get("/download/picture/{id}")
+async def download_picture(id: int):
+    file_path = os.getcwd() + "/images/" + str(id) + ".png"
     if os.path.exists(file_path):
-        return FileResponse(path=file_path, media_type='application/octet-stream', filename=name + ".png")
+        return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".png")
 
     raise HTTPException(status_code=404, detail="No files with that name")
 
