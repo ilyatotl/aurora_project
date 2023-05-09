@@ -5,15 +5,25 @@ from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from jose import jwt
+from datetime import datetime, timedelta
 import os
 import shutil
 import psycopg2
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+ACCESS_TOKEN_SECRET_KEY = "50b9cc07db6b0758759ddaeaae02d8f6cab82f5cf4199dfdc7280241f269e761"
+ACCESS_TOKEN_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 * 6
 
 conn = psycopg2.connect(dbname='aurora_store',
                         user='ilya', password='111111', host='172.17.0.1')
 
 # host.docker.internal:host-gateway
+
 
 app = FastAPI()
 
@@ -31,6 +41,18 @@ class Application:
         self.picture_path = picture_path
         self.short_description = short_description
         self.long_description = long_description
+
+
+class User(BaseModel):
+    id: int
+    full_name: str
+    username: str
+    email: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 
 @app.get("/")
@@ -99,21 +121,80 @@ async def download_picture(id: int):
     raise HTTPException(status_code=404, detail="No files with that name")
 
 
-# @app.post("/register")
-# async def register(email: str, password: str):
-#     for e in users:
-#         if e == email:
-#             raise HTTPException(
-#                 status_code=400, detail="User with this email already exists")
-
-#     users[email] = password
-#     return {email: "was registered"}
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
 
-# @app.get("/authorize")
-# async def authorize(email: str, password: str):
-#     for e in users:
-#         if e == email and users[e] == password:
-#             return {email: "successfully authorized"}
+def authenticate_user(username: str, password: str):
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE username=(%s)",
+                       (username,))
+        user = cursor.fetchone()
+        conn.commit()
 
-#     raise HTTPException(status_code=401, detail="Wrong email or password")
+    if user is None:
+        return False
+    if not verify_password(password, user[4]):
+        return False
+
+    return User(id=user[0], full_name=user[1], username=user[2], email=user[3])
+
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(
+        to_encode, ACCESS_TOKEN_SECRET_KEY, ACCESS_TOKEN_ALGORITHM)
+    return encoded_jwt
+
+
+async def get_user(token: str):
+    payload = jwt.decode(token, ACCESS_TOKEN_SECRET_KEY,
+                         algorithms=[ACCESS_TOKEN_ALGORITHM])
+    username = payload.get("sub")
+
+    if username is None:
+        raise HTTPException(status_code=401, detail="Could not authenticate")
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT (id, full_name, username, email, encrypted_password) FROM users WHERE username=(%s)",
+                       (username,))
+        user = cursor.fetchall()
+
+    if user == []:
+        return False
+
+    return User(id=user[0], full_name=user[1], username=user[2], email=user[3])
+
+
+@app.post("/register")
+async def register(full_name: str, username: str, email: str, password: str):
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM users WHERE (username=(%s) OR email=(%s))",
+                       (username, email,))
+        u = cursor.fetchall()
+    if u != []:
+        raise HTTPException(
+            status_code=400,
+            detail="User with such email or username already exists",
+        )
+
+    with conn.cursor() as cursor:
+        cursor.execute("INSERT INTO users (full_name, username, email, encrypted_password) VALUES (%s, %s, %s, %s)",
+                       (full_name, username, email, pwd_context.hash(password),))
+        conn.commit()
+
+
+@app.post("/authenticate", response_model=Token)
+async def authenticate(username: str, password: str):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+        )
+
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
