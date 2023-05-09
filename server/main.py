@@ -13,17 +13,17 @@ import os
 import shutil
 import psycopg2
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+ACCESS_TOKEN_SECRET_KEY = "50b9cc07db6b0758759ddaeaae02d8f6cab82f5cf4199dfdc7280241f269e761"
+ACCESS_TOKEN_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 * 6
 
 conn = psycopg2.connect(dbname='aurora_store',
                         user='ilya', password='111111', host='172.17.0.1')
 
 # host.docker.internal:host-gateway
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-ACCESS_TOKEN_SECRET_KEY = "50b9cc07db6b0758759ddaeaae02d8f6cab82f5cf4199dfdc7280241f269e761"
-ACCESS_TOKEN_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 * 6
 
 app = FastAPI()
 
@@ -127,11 +127,12 @@ def verify_password(plain_password, hashed_password):
 
 def authenticate_user(username: str, password: str):
     with conn.cursor() as cursor:
-        cursor.execute("SELECT (id, full_name, username, email, encrypted_password) FROM users WHERE username=(%s)",
+        cursor.execute("SELECT * FROM users WHERE username=(%s)",
                        (username,))
         user = cursor.fetchone()
+        conn.commit()
 
-    if user == []:
+    if user is None:
         return False
     if not verify_password(password, user[4]):
         return False
@@ -160,7 +161,7 @@ async def get_user(token: str):
     with conn.cursor() as cursor:
         cursor.execute("SELECT (id, full_name, username, email, encrypted_password) FROM users WHERE username=(%s)",
                        (username,))
-        user = cursor.fetchone()
+        user = cursor.fetchall()
 
     if user == []:
         return False
@@ -171,9 +172,9 @@ async def get_user(token: str):
 @app.post("/register")
 async def register(full_name: str, username: str, email: str, password: str):
     with conn.cursor() as cursor:
-        cursor.execute("SELECT id FROM users WHERE username=(%s) OR email=(%s)",
+        cursor.execute("SELECT id FROM users WHERE (username=(%s) OR email=(%s))",
                        (username, email,))
-        u = cursor.fetchone()
+        u = cursor.fetchall()
     if u != []:
         raise HTTPException(
             status_code=400,
@@ -186,7 +187,7 @@ async def register(full_name: str, username: str, email: str, password: str):
         conn.commit()
 
 
-@app.post("/token", response_model=Token)
+@app.post("/authenticate", response_model=Token)
 async def authenticate(username: str, password: str):
     user = authenticate_user(username, password)
     if not user:
@@ -195,8 +196,5 @@ async def authenticate(username: str, password: str):
             detail="Incorrect username or password",
         )
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
