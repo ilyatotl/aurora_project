@@ -103,9 +103,28 @@ async def upload_file(name: str, upload_file: UploadFile, image: UploadFile, dev
     return {name: "was added to the server"}
 
 
+@app.delete("/delete/{name}")
+async def delete_file(name: str):
+    with conn.cursor() as cursor:
+        cursor.execute('SELECT id FROM applications WHERE name = %s', (name,))
+        app = cursor.fetchone()
+        if app is None:
+            raise HTTPException(
+                status_code=404, detail="No such file")
+
+    file_path = "files/" + str(app[0]) + ".rpm"
+    picture_path = "images/" + str(app[0]) + ".png"
+    os.remove(file_path)
+    os.remove(picture_path)
+
+    with conn.cursor() as cursor:
+        cursor.execute('DELETE FROM applications WHERE id = %s', (app[0],))
+        conn.commit()
+
+
 @app.get("/download/file/{id}")
 async def download_file(id: int):
-    file_path = os.getcwd() + "/files/" + str(id) + ".rpm"
+    file_path = "files/" + str(id) + ".rpm"
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".rpm")
 
@@ -114,7 +133,7 @@ async def download_file(id: int):
 
 @app.get("/download/picture/{id}")
 async def download_picture(id: int):
-    file_path = os.getcwd() + "/images/" + str(id) + ".png"
+    file_path = "images/" + str(id) + ".png"
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".png")
 
