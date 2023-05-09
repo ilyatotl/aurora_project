@@ -95,11 +95,9 @@ async def upload_file(name: str, upload_file: UploadFile, image: UploadFile, dev
         conn.commit()
 
     with open("files/" + str(id) + ".rpm", "wb") as wf:
-        print("files/" + str(id) + ".rpm")
         shutil.copyfileobj(upload_file.file, wf)
 
     with open("images/" + str(id) + ".png", "wb") as wf:
-        print("images/" + str(id) + ".png")
         shutil.copyfileobj(image.file, wf)
 
     return {name: "was added to the server"}
@@ -116,8 +114,6 @@ async def delete_file(name: str):
 
     file_path = "files/" + str(app[0]) + ".rpm"
     picture_path = "images/" + str(app[0]) + ".png"
-    print(file_path)
-    print(picture_path)
     os.remove(file_path)
     os.remove(picture_path)
 
@@ -129,7 +125,6 @@ async def delete_file(name: str):
 @app.get("/download/file/{id}")
 async def download_file(id: int):
     file_path = "files/" + str(id) + ".rpm"
-    print(file_path)
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".rpm")
 
@@ -139,7 +134,6 @@ async def download_file(id: int):
 @app.get("/download/picture/{id}")
 async def download_picture(id: int):
     file_path = "images/" + str(id) + ".png"
-    print(file_path)
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".png")
 
