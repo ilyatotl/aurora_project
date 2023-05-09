@@ -1,7 +1,7 @@
 # uvicorn main:app --reload
 
-from typing import List
-from fastapi import FastAPI, UploadFile, HTTPException
+from typing import List, Annotated
+from fastapi import FastAPI, UploadFile, HTTPException, Header
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import os
 import shutil
 import psycopg2
+import time
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -55,8 +56,31 @@ class Token(BaseModel):
     token_type: str
 
 
+def decodeJWT(token: str) -> str:
+    decoded_token = jwt.decode(token, ACCESS_TOKEN_SECRET_KEY, algorithms=[
+                               ACCESS_TOKEN_ALGORITHM])
+    if decoded_token["exp"] <= time.time():
+        return None
+
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM users WHERE username=(%s)",
+                       (decoded_token["sub"],))
+        u = cursor.fetchall()
+    if u == []:
+        return None
+
+    return decoded_token["sub"]
+
+
 @app.get("/")
-async def read_root():
+async def read_root(authorization: str | None = Header(default=None)):
+    if authorization is None:
+        raise HTTPException(status_code=401)
+
+    username = decodeJWT(authorization)
+    if username is None:
+        raise HTTPException(status_code=401)
+
     l: List[any] = []
 
     with conn.cursor() as cursor:
@@ -104,7 +128,14 @@ async def upload_file(name: str, upload_file: UploadFile, image: UploadFile, dev
 
 
 @app.get("/download/file/{id}")
-async def download_file(id: int):
+async def download_file(id: int, authorization: str | None = Header(default=None)):
+    if authorization is None:
+        raise HTTPException(status_code=401)
+
+    username = decodeJWT(authorization)
+    if username is None:
+        raise HTTPException(status_code=401)
+
     file_path = os.getcwd() + "/files/" + str(id) + ".rpm"
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".rpm")
@@ -113,7 +144,14 @@ async def download_file(id: int):
 
 
 @app.get("/download/picture/{id}")
-async def download_picture(id: int):
+async def download_picture(id: int, authorization: str | None = Header(default=None)):
+    if authorization is None:
+        raise HTTPException(status_code=401)
+
+    username = decodeJWT(authorization)
+    if username is None:
+        raise HTTPException(status_code=401)
+
     file_path = os.getcwd() + "/images/" + str(id) + ".png"
     if os.path.exists(file_path):
         return FileResponse(path=file_path, media_type='application/octet-stream', filename=str(id) + ".png")
