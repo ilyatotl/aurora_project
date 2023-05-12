@@ -19,6 +19,8 @@ ACCESS_TOKEN_SECRET_KEY = "50b9cc07db6b0758759ddaeaae02d8f6cab82f5cf4199dfdc7280
 ACCESS_TOKEN_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 * 6
 
+APP_NAME = "ru.auroraos.project1-0.1-1.i486.rpm"
+
 conn = psycopg2.connect(dbname='aurora_store',
                         user='ilya', password='111111', host='172.17.0.1')
 
@@ -206,7 +208,13 @@ async def register(full_name: str, username: str, email: str, password: str):
         conn.commit()
 
 
-@app.post("/authenticate", response_model=Token)
+@app.get("/release")
+async def release():
+    file_path = "release_app/" + APP_NAME
+    return FileResponse(path=file_path, media_type='application/octet-stream', filename=APP_NAME)
+
+
+@app.get("/authenticate", response_model=Token)
 async def authenticate(username: str, password: str):
     user = authenticate_user(username, password)
     if not user:
